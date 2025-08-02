@@ -42,7 +42,7 @@ source /etc/mailinabox.conf # load global vars
 # * `ca-certificates`: A trust store used to squelch postfix warnings about
 #   untrusted opportunistically-encrypted connections.
 echo "Installing Postfix (SMTP server)..."
-apt_install postfix postfix-sqlite postfix-pcre postgrey ca-certificates
+apt_install postfix postfix-sqlite postfix-pcre ca-certificates
 
 # ### Basic Settings
 
@@ -211,7 +211,7 @@ tools/editconf.py /etc/postfix/main.cf \
 #
 # In a basic setup we would pass mail directly to Dovecot by setting
 # virtual_transport to `lmtp:unix:private/dovecot-lmtp`.
-tools/editconf.py /etc/postfix/main.cf "virtual_transport=lmtp:[127.0.0.1]:10025"
+tools/editconf.py /etc/postfix/main.cf "virtual_transport=lmtp:[127.0.0.1]:10026"
 # Clear the lmtp_destination_recipient_limit setting which in previous
 # versions of Mail-in-a-Box was set to 1 because of a spampd bug.
 # See https://github.com/mail-in-a-box/mailinabox/issues/1523.
@@ -237,8 +237,8 @@ tools/editconf.py /etc/postfix/main.cf  -e lmtp_destination_recipient_limit=
 # whitelisted) then postfix does a DEFER_IF_REJECT, which results in all "unknown user" sorts of messages turning into #NODOC
 # "450 4.7.1 Client host rejected: Service unavailable". This is a retry code, so the mail doesn't properly bounce. #NODOC
 tools/editconf.py /etc/postfix/main.cf \
-	smtpd_sender_restrictions="reject_non_fqdn_sender,reject_unknown_sender_domain,reject_authenticated_sender_login_mismatch,reject_rhsbl_sender dbl.spamhaus.org=127.0.1.[2..99]" \
-	smtpd_recipient_restrictions="permit_sasl_authenticated,permit_mynetworks,reject_rbl_client zen.spamhaus.org=127.0.0.[2..11],reject_unlisted_recipient,check_policy_service inet:127.0.0.1:10023,check_policy_service inet:127.0.0.1:12340"
+	smtpd_sender_restrictions="permit_sasl_authenticated,reject_non_fqdn_sender,reject_unknown_sender_domain,reject_authenticated_sender_login_mismatch,reject_rhsbl_sender dbl.spamhaus.org=127.0.1.[2..99]" \
+	smtpd_recipient_restrictions="permit_sasl_authenticated,permit_mynetworks,reject_unlisted_recipient"
 
 # Postfix connects to Postgrey on the 127.0.0.1 interface specifically. Ensure that
 # Postgrey listens on the same interface (and not IPv6, for instance).
@@ -255,48 +255,22 @@ tools/editconf.py /etc/postfix/main.cf \
 # (luckily $STORAGE_ROOT does not currently work with spaces), or it needs to be a
 # symlink without spaces that can point to a folder with spaces).  We'll just assume
 # $STORAGE_ROOT won't have spaces to simplify things.
-tools/editconf.py /etc/default/postgrey \
-	POSTGREY_OPTS=\""--inet=127.0.0.1:10023 --delay=180 --dbdir=$STORAGE_ROOT/mail/postgrey/db"\"
+# tools/editconf.py /etc/default/postgrey \
+# 	POSTGREY_OPTS=\""--inet=127.0.0.1:10023 --delay=180 --dbdir=$STORAGE_ROOT/mail/postgrey/db"\"
 
 
 # If the $STORAGE_ROOT/mail/postgrey is empty, copy the postgrey database over from the old location
-if [ ! -d "$STORAGE_ROOT/mail/postgrey/db" ]; then
+# if [ ! -d "$STORAGE_ROOT/mail/postgrey/db" ]; then
 	# Stop the service
-	service postgrey stop
+#	service postgrey stop
 	# Ensure the new paths for postgrey db exists
-	mkdir -p "$STORAGE_ROOT/mail/postgrey/db"
+#	mkdir -p "$STORAGE_ROOT/mail/postgrey/db"
 	# Move over database files
-	mv /var/lib/postgrey/* "$STORAGE_ROOT/mail/postgrey/db/" || true
-fi
+#	mv /var/lib/postgrey/* "$STORAGE_ROOT/mail/postgrey/db/" || true
+# fi
 # Ensure permissions are set
-chown -R postgrey:postgrey "$STORAGE_ROOT/mail/postgrey/"
-chmod 700 "$STORAGE_ROOT/mail/postgrey/"{,db}
-
-# We are going to setup a newer whitelist for postgrey, the version included in the distribution is old
-cat > /etc/cron.daily/mailinabox-postgrey-whitelist << EOF;
-#!/bin/bash
-
-# Mail-in-a-Box
-
-# check we have a postgrey_whitelist_clients file and that it is not older than 28 days
-if [ ! -f /etc/postgrey/whitelist_clients ] || find /etc/postgrey/whitelist_clients -mtime +28 | grep -q '.' ; then
-    # ok we need to update the file, so lets try to fetch it
-    if curl https://postgrey.schweikert.ch/pub/postgrey_whitelist_clients --output /tmp/postgrey_whitelist_clients -sS --fail > /dev/null 2>&1 ; then
-        # if fetching hasn't failed yet then check it is a plain text file
-        # curl manual states that --fail sometimes still produces output
-        # this final check will at least check the output is not html
-        # before moving it into place
-        if [ "\$(file -b --mime-type /tmp/postgrey_whitelist_clients)" == "text/plain" ]; then
-            mv /tmp/postgrey_whitelist_clients /etc/postgrey/whitelist_clients
-            service postgrey restart
-	else
-            rm /tmp/postgrey_whitelist_clients
-        fi
-    fi
-fi
-EOF
-chmod +x /etc/cron.daily/mailinabox-postgrey-whitelist
-/etc/cron.daily/mailinabox-postgrey-whitelist
+# chown -R postgrey:postgrey "$STORAGE_ROOT/mail/postgrey/"
+# chmod 700 "$STORAGE_ROOT/mail/postgrey/"{,db}
 
 # Increase the message size limit from 10MB to 128MB.
 # The same limit is specified in nginx.conf for mail submitted via webmail and Z-Push.
@@ -312,4 +286,3 @@ ufw_allow submission
 # Restart services
 
 restart_service postfix
-restart_service postgrey

@@ -205,7 +205,7 @@ sed -i "s/#mail_plugins = .*/mail_plugins = \$mail_plugins sieve/" /etc/dovecot/
 # is also where the ManageSieve service stores the user's scripts.
 cat > /etc/dovecot/conf.d/99-local-sieve.conf << EOF;
 plugin {
-  sieve_before = /etc/dovecot/sieve-spam.sieve
+#  sieve_before = /etc/dovecot/sieve-spam.sieve
   sieve_before2 = $STORAGE_ROOT/mail/sieve/global_before
   sieve_after = $STORAGE_ROOT/mail/sieve/global_after
   sieve = $STORAGE_ROOT/mail/sieve/%d/%n.sieve
@@ -217,8 +217,8 @@ EOF
 # Copy the global sieve script into where we've told Dovecot to look for it. Then
 # compile it. Global scripts must be compiled now because Dovecot won't have
 # permission later.
-cp conf/sieve-spam.txt /etc/dovecot/sieve-spam.sieve
-sievec /etc/dovecot/sieve-spam.sieve
+# cp conf/sieve-spam.txt /etc/dovecot/sieve-spam.sieve
+# sievec /etc/dovecot/sieve-spam.sieve
 
 # PERMISSIONS
 
